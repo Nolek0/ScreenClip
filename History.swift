@@ -57,8 +57,13 @@ final class HistoryStore {
         reload()
     }
 
-    func clear() {
-        for s in shots { try? FileManager.default.trashItem(at: s.url, resultingItemURL: nil) }
+    /// permanently: true deletes the files for good instead of moving them to the Trash.
+    func clear(permanently: Bool) {
+        for s in shots {
+            if permanently { try? FileManager.default.removeItem(at: s.url) }
+            else { try? FileManager.default.trashItem(at: s.url, resultingItemURL: nil) }
+        }
+        Thumbs.cache.removeAllObjects()
         reload()
     }
 }
@@ -120,5 +125,46 @@ final class ShotMenuView: NSView {
         enclosingMenuItem?.menu?.supermenu?.cancelTracking()
         enclosingMenuItem?.menu?.cancelTracking()
         onClick()
+    }
+}
+
+/// Red "Clear History" button shown at the top of the History submenu.
+final class ClearMenuView: NSView {
+    let onClick: () -> Void
+    private let label: String
+    private var hovered = false { didSet { needsDisplay = true } }
+
+    init(label: String, onClick: @escaping () -> Void) {
+        self.onClick = onClick
+        self.label = label
+        super.init(frame: NSRect(x: 0, y: 0, width: ShotMenuView.width, height: 44))
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let r = bounds.insetBy(dx: 12, dy: 6)
+        (hovered ? NSColor.systemRed.blended(withFraction: 0.2, of: .black)! : NSColor.systemRed).setFill()
+        NSBezierPath(roundedRect: r, xRadius: 8, yRadius: 8).fill()
+        let text = NSMutableAttributedString()
+        if let icon = NSImage(systemSymbolName: "trash.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 13, weight: .semibold).applying(.init(paletteColors: [.white]))) {
+            let a = NSTextAttachment(); a.image = icon
+            text.append(NSAttributedString(attachment: a))
+            text.append(NSAttributedString(string: "  "))
+        }
+        text.append(NSAttributedString(string: label))
+        text.addAttributes([.font: NSFont.systemFont(ofSize: 13, weight: .semibold), .foregroundColor: NSColor.white],
+                           range: NSRange(location: 0, length: text.length))
+        let s = text.size()
+        text.draw(at: NSPoint(x: r.midX - s.width / 2, y: r.midY - s.height / 2))
+    }
+    override func mouseEntered(with e: NSEvent) { hovered = true }
+    override func mouseExited(with e: NSEvent) { hovered = false }
+    override func mouseUp(with e: NSEvent) {
+        enclosingMenuItem?.menu?.supermenu?.cancelTracking()
+        enclosingMenuItem?.menu?.cancelTracking()
+        // Let the menu close before showing any alert.
+        DispatchQueue.main.async { self.onClick() }
     }
 }

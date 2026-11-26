@@ -28,6 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             rebuildMenu()
         }
     }
+    var permanentDelete: Bool {
+        get { defaults.bool(forKey: "permanentDelete") }
+        set { defaults.set(newValue, forKey: "permanentDelete"); rebuildMenu() }
+    }
     var deleteAfterCopy: Bool {
         get { defaults.bool(forKey: "deleteAfterCopy") }
         set { defaults.set(newValue, forKey: "deleteAfterCopy"); rebuildMenu() }
@@ -154,7 +158,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(h)
         menu.addItem(.separator())
         add(menu, "Copy Automatically", #selector(toggleEnabled), enabled)
-        add(menu, "Instant Capture (No Thumbnail)", #selector(toggleInstant), instantCapture)
+        let thumb = NSMenuItem(title: "Show Screenshot Thumbnail", action: #selector(toggleInstant), keyEquivalent: "")
+        thumb.target = self
+        thumb.state = instantCapture ? .off : .on
+        // The macOS thumbnail delays saving (and so copying) by ~5 s.
+        thumb.toolTip = "When on, macOS shows the preview in the corner but the copy waits ~5 s."
+        if #available(macOS 14.4, *) { thumb.subtitle = instantCapture ? "Off: screenshots copy instantly" : "On: copying waits ~5 s" }
+        menu.addItem(thumb)
         add(menu, "Click to Copy in History", #selector(toggleClickToCopy), clickToCopy)
         add(menu, "Delete File After Copying", #selector(toggleDelete), deleteAfterCopy)
         add(menu, "Launch at Login", #selector(toggleLogin), SMAppService.mainApp.status == .enabled)
@@ -186,6 +196,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(e)
             return
         }
+        let clearItem = NSMenuItem()
+        clearItem.view = ClearMenuView(label: permanentDelete ? "Delete History Permanently" : "Clear History") { [weak self] in
+            self?.clearHistory()
+        }
+        menu.addItem(clearItem)
+        let perm = NSMenuItem(title: "Skip Trash (Delete Permanently)", action: #selector(togglePermanent), keyEquivalent: "")
+        perm.target = self
+        perm.state = permanentDelete ? .on : .off
+        menu.addItem(perm)
+        menu.addItem(.separator())
         let header = NSMenuItem(title: clickToCopy ? "Click a screenshot to copy it" : "Click a screenshot to open it",
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
@@ -205,16 +225,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let reveal = NSMenuItem(title: "Open History Folder", action: #selector(openHistoryFolder), keyEquivalent: "")
         reveal.target = self
         menu.addItem(reveal)
-        let clear = NSMenuItem(title: "Clear History", action: #selector(clearHistory), keyEquivalent: "")
-        clear.target = self
-        menu.addItem(clear)
     }
 
     func historyClicked(_ url: URL) {
         if clickToCopy { _ = writeImage(url) } else { NSWorkspace.shared.open(url) }
     }
     @objc func openHistoryFolder() { NSWorkspace.shared.open(HistoryStore.shared.dir) }
-    @objc func clearHistory() { HistoryStore.shared.clear() }
+    @objc func togglePermanent() { permanentDelete.toggle() }
+    func clearHistory() {
+        let count = HistoryStore.shared.shots.count
+        if permanentDelete {
+            NSApp.activate(ignoringOtherApps: true)
+            let a = NSAlert()
+            a.alertStyle = .critical
+            a.messageText = "Permanently delete \(count) screenshot\(count == 1 ? "" : "s")?"
+            a.informativeText = "They won't go to the Trash. This can't be undone."
+            a.addButton(withTitle: "Delete Permanently").hasDestructiveAction = true
+            a.addButton(withTitle: "Cancel")
+            guard a.runModal() == .alertFirstButtonReturn else { return }
+        }
+        HistoryStore.shared.clear(permanently: permanentDelete)
+    }
     @objc func toggleDelete() { deleteAfterCopy.toggle() }
     @objc func toggleLogin() {
         do {

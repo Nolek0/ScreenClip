@@ -25,7 +25,7 @@ ScreenClip is a tiny macOS app that runs quietly in the background. It has no Do
 |---|---|---|
 | 📋 | **Auto-copy** | Every screenshot (⌘⇧3, ⌘⇧4, ⌘⇧5) goes straight to the clipboard. |
 | 🕘 | **History** | A submenu shows your last 30 screenshots with a large preview. Click one to copy it again. |
-| ⚡ | **Instant Capture** | Turns off the macOS floating thumbnail, which delays saving by about 5 seconds. |
+| ⚡ | **Thumbnail on/off** | Show or hide the macOS corner thumbnail. Hiding it makes copying instant (it delays saving by about 5 seconds). |
 | 🗑️ | **Delete After Copying** | Moves the file to the Trash once copied, so your Desktop stays clean. |
 | 🚀 | **Launch at Login** | ScreenClip starts with your Mac. |
 | ✅ | **Visual feedback** | The menu bar icon turns into a checkmark for a second when a copy succeeds. |
@@ -71,7 +71,7 @@ Folder: Desktop
 🕘 History                       ›
 ──────────────────────────────────
 ✓ Copy Automatically
-  Instant Capture (No Thumbnail)
+  Show Screenshot Thumbnail
 ✓ Click to Copy in History
   Delete File After Copying
   Launch at Login
@@ -83,7 +83,7 @@ Quit ScreenClip                ⌘Q
 |---|---|
 | **History ›** | Opens your recent screenshots with previews. |
 | **Copy Automatically** | Pauses or resumes ScreenClip. |
-| **Instant Capture** | Removes the ~5 s macOS delay before a screenshot is saved. |
+| **Show Screenshot Thumbnail** | On: macOS shows the corner preview, but the copy waits ~5 s. Off: no preview, instant copy. |
 | **Click to Copy in History** | On: clicking a screenshot copies it. Off: clicking opens it in Preview. |
 | **Delete File After Copying** | Moves the screenshot to the Trash after copying. It stays in the history. |
 | **Launch at Login** | Starts ScreenClip when you log in. The app must be in `/Applications`. |
@@ -93,7 +93,9 @@ Quit ScreenClip                ⌘Q
 - The **30 most recent** screenshots appear in the menu, newest first.
 - ScreenClip keeps its own copy of the **last 200** screenshots in
   `~/Library/Application Support/ScreenClip/History`.
-- At the bottom of the submenu: **Open History Folder** and **Clear History** (files go to the Trash).
+- At the top of the submenu, the red **Clear History** button empties the history. By default the files go to the Trash.
+- Tick **Skip Trash (Delete Permanently)** right below it to delete them for good instead. ScreenClip asks for confirmation first, since this can't be undone.
+- At the bottom of the submenu: **Open History Folder**.
 
 ## ⚙️ How it works
 
@@ -101,7 +103,7 @@ Quit ScreenClip                ⌘Q
 2. It watches that folder. When a new file appears, it checks for the tag macOS puts on every screenshot (`kMDItemIsScreenCapture`). Other files you add to the Desktop are ignored.
 3. The image goes to the clipboard, and a copy is saved to the history.
 
-**Why is there sometimes a delay?** By default, macOS shows a thumbnail in the bottom-right corner for about 5 seconds and only saves the file afterwards. Turn on **Instant Capture** to remove it. It's the same as unticking "Show Floating Thumbnail" in ⌘⇧5 › Options.
+**Why is there sometimes a delay?** By default, macOS shows a thumbnail in the bottom-right corner for about 5 seconds and only saves the file afterwards. Untick **Show Screenshot Thumbnail** to remove it. It's the same as unticking "Show Floating Thumbnail" in ⌘⇧5 › Options.
 
 ## 🛠️ Build from source
 
@@ -148,7 +150,7 @@ ScreenClip/
 rm -rf /Applications/ScreenClip.app ~/Library/Application\ Support/ScreenClip
 ```
 
-3. If you turned on **Instant Capture** and want the macOS thumbnail back:
+3. If you turned the thumbnail off and want it back:
 
 ```bash
 defaults write com.apple.screencapture show-thumbnail -bool true
