@@ -2,7 +2,7 @@
 # Builds ScreenClip.app. Run ./build.sh --dmg to also create ScreenClip-<version>.dmg.
 set -e
 cd "$(dirname "$0")"
-VERSION="1.0.1"
+VERSION="1.1.0"
 APP=ScreenClip.app
 BUILD=build
 
@@ -11,7 +11,7 @@ mkdir -p $APP/Contents/MacOS $APP/Contents/Resources $BUILD
 
 # Universal binary (Apple Silicon + Intel).
 for arch in arm64 x86_64; do
-  swiftc -O -target $arch-apple-macos13.0 main.swift History.swift \
+  swiftc -O -target $arch-apple-macos13.0 *.swift \
     -o $BUILD/ScreenClip-$arch -framework Cocoa -framework ServiceManagement
 done
 lipo -create $BUILD/ScreenClip-arm64 $BUILD/ScreenClip-x86_64 -output $APP/Contents/MacOS/ScreenClip

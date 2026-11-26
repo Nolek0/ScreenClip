@@ -9,11 +9,11 @@ struct Shot: Identifiable, Hashable {
     var id: URL { url }
 }
 
-final class HistoryStore {
+final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()
     static let maxItems = 200
 
-    private(set) var shots: [Shot] = []
+    @Published private(set) var shots: [Shot] = []
     let dir: URL
 
     init() {
