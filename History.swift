@@ -18,7 +18,12 @@ final class HistoryStore {
 
     init() {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        dir = base.appendingPathComponent("ScreenClip/Historique", isDirectory: true)
+        dir = base.appendingPathComponent("ScreenClip/History", isDirectory: true)
+        // Migrate the history folder used by early (French) builds.
+        let old = base.appendingPathComponent("ScreenClip/Historique", isDirectory: true)
+        if FileManager.default.fileExists(atPath: old.path), !FileManager.default.fileExists(atPath: dir.path) {
+            try? FileManager.default.moveItem(at: old, to: dir)
+        }
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         reload()
     }
@@ -35,11 +40,11 @@ final class HistoryStore {
     /// Keeps a private copy so the history survives even if the original is deleted.
     func add(_ source: URL) {
         let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd 'à' HH.mm.ss"
-        var dest = dir.appendingPathComponent("Capture \(f.string(from: Date())).\(source.pathExtension)")
+        f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
+        var dest = dir.appendingPathComponent("Screenshot \(f.string(from: Date())).\(source.pathExtension)")
         var n = 2
         while FileManager.default.fileExists(atPath: dest.path) {
-            dest = dir.appendingPathComponent("Capture \(f.string(from: Date())) (\(n)).\(source.pathExtension)"); n += 1
+            dest = dir.appendingPathComponent("Screenshot \(f.string(from: Date())) (\(n)).\(source.pathExtension)"); n += 1
         }
         guard (try? FileManager.default.copyItem(at: source, to: dest)) != nil else { return }
         reload()

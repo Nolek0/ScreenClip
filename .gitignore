@@ -1,2 +1,4 @@
 ScreenClip.app/
+build/
+*.dmg
 .DS_Store

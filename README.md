@@ -1,141 +1,159 @@
-# 📸 ScreenClip
+<p align="center">
+  <img src="assets/icon.png" width="128" alt="ScreenClip icon">
+</p>
 
-**Les captures d'écran du Mac, directement dans le presse-papier — comme sur Windows.**
+<h1 align="center">ScreenClip</h1>
 
-ScreenClip est une petite app macOS qui tourne discrètement en arrière-plan. Elle n'a pas d'icône dans le Dock : elle vit uniquement dans la barre des menus, en haut de l'écran. Dès que tu prends une capture d'écran, elle la copie dans le presse-papier. Tu n'as plus qu'à faire **⌘V** où tu veux : Discord, Messages, Notion, Photoshop…
+<p align="center">
+  <b>Mac screenshots, straight to your clipboard — just like on Windows.</b>
+</p>
 
-![macOS](https://img.shields.io/badge/macOS-13%2B-black?logo=apple)
-![Swift](https://img.shields.io/badge/Swift-6-orange?logo=swift)
-![Taille](https://img.shields.io/badge/d%C3%A9pendances-aucune-brightgreen)
+<p align="center">
+  <a href="https://github.com/Nolek0/ScreenClip/releases/latest"><img src="https://img.shields.io/github/v/release/Nolek0/ScreenClip?label=download&color=3b82f6" alt="Download"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-555" alt="Universal">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT">
+</p>
 
 ---
 
-## ✨ Fonctionnalités
+ScreenClip is a tiny macOS app that runs quietly in the background. It has no Dock icon and lives only in the menu bar. Every time you take a screenshot, it copies it to your clipboard, so you can paste it anywhere with **⌘V**: Discord, Messages, Slack, Notion, Photoshop…
 
-| | Fonction | Détail |
+## ✨ Features
+
+| | Feature | Details |
 |---|---|---|
-| 📋 | **Copie automatique** | Chaque capture (⌘⇧3, ⌘⇧4, ⌘⇧5) part directement dans le presse-papier. |
-| 🕘 | **Historique** | Un sous-menu affiche tes 30 dernières captures avec un grand aperçu. Un clic en recopie une. |
-| ⚡ | **Capture instantanée** | Désactive la vignette flottante de macOS, qui retarde l'enregistrement d'environ 5 secondes. |
-| 🗑️ | **Supprimer après copie** | La capture est envoyée à la Corbeille une fois copiée, pour garder le Bureau propre. |
-| 🚀 | **Lancer au démarrage** | ScreenClip démarre toute seule avec le Mac. |
-| ✅ | **Retour visuel** | L'icône devient une coche verte pendant une seconde quand la copie a réussi. |
+| 📋 | **Auto-copy** | Every screenshot (⌘⇧3, ⌘⇧4, ⌘⇧5) goes straight to the clipboard. |
+| 🕘 | **History** | A submenu shows your last 30 screenshots with a large preview. Click one to copy it again. |
+| ⚡ | **Instant Capture** | Turns off the macOS floating thumbnail, which delays saving by about 5 seconds. |
+| 🗑️ | **Delete After Copying** | Moves the file to the Trash once copied, so your Desktop stays clean. |
+| 🚀 | **Launch at Login** | ScreenClip starts with your Mac. |
+| ✅ | **Visual feedback** | The menu bar icon turns into a checkmark for a second when a copy succeeds. |
 
----
+## 📦 Install
 
-## 📦 Installation
+1. **[Download the latest `ScreenClip-x.y.z.dmg`](https://github.com/Nolek0/ScreenClip/releases/latest)**.
+2. Open the DMG and drag **ScreenClip** onto **Applications**.
+3. Open ScreenClip from your Applications folder.
 
-### 1. Prérequis
+### "ScreenClip can't be opened" warning
 
-Les outils en ligne de commande d'Xcode (gratuits) :
+ScreenClip isn't signed with a paid Apple Developer certificate, so macOS blocks it the first time. To allow it:
+
+- Go to **System Settings › Privacy & Security**, scroll down, and click **Open Anyway** next to the ScreenClip message.
+
+Or run this once in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ScreenClip.app
+```
+
+### Desktop access
+
+On first launch, macOS asks **"ScreenClip would like to access files in your Desktop folder."** Click **Allow**: that's where macOS saves your screenshots.
+
+> 💡 Then tick **Launch at Login** in the menu so you never have to think about it again.
+
+## 🖱️ Usage
+
+1. Take a screenshot as usual: **⌘⇧3** (full screen), **⌘⇧4** (selection) or **⌘⇧5** (toolbar).
+2. The 📷 icon in the menu bar briefly turns into a ✅.
+3. Paste with **⌘V**.
+
+### The menu
+
+Click the 📷 icon in the menu bar:
+
+```
+ScreenClip
+Folder: Desktop
+──────────────────────────────────
+🕘 History                       ›
+──────────────────────────────────
+✓ Copy Automatically
+  Instant Capture (No Thumbnail)
+✓ Click to Copy in History
+  Delete File After Copying
+  Launch at Login
+──────────────────────────────────
+Quit ScreenClip                ⌘Q
+```
+
+| Option | What it does |
+|---|---|
+| **History ›** | Opens your recent screenshots with previews. |
+| **Copy Automatically** | Pauses or resumes ScreenClip. |
+| **Instant Capture** | Removes the ~5 s macOS delay before a screenshot is saved. |
+| **Click to Copy in History** | On: clicking a screenshot copies it. Off: clicking opens it in Preview. |
+| **Delete File After Copying** | Moves the screenshot to the Trash after copying. It stays in the history. |
+| **Launch at Login** | Starts ScreenClip when you log in. The app must be in `/Applications`. |
+
+### History
+
+- The **30 most recent** screenshots appear in the menu, newest first.
+- ScreenClip keeps its own copy of the **last 200** screenshots in
+  `~/Library/Application Support/ScreenClip/History`.
+- At the bottom of the submenu: **Open History Folder** and **Clear History** (files go to the Trash).
+
+## ⚙️ How it works
+
+1. ScreenClip reads the folder where macOS saves screenshots (the Desktop by default, or whatever you picked in ⌘⇧5 › Options). If you change it, ScreenClip picks it up within about 10 seconds.
+2. It watches that folder. When a new file appears, it checks for the tag macOS puts on every screenshot (`kMDItemIsScreenCapture`). Other files you add to the Desktop are ignored.
+3. The image goes to the clipboard, and a copy is saved to the history.
+
+**Why is there sometimes a delay?** By default, macOS shows a thumbnail in the bottom-right corner for about 5 seconds and only saves the file afterwards. Turn on **Instant Capture** to remove it. It's the same as unticking "Show Floating Thumbnail" in ⌘⇧5 › Options.
+
+## 🛠️ Build from source
+
+You need the Xcode command line tools:
 
 ```bash
 xcode-select --install
 ```
 
-### 2. Télécharger et compiler
+Then:
 
 ```bash
-git clone https://github.com/Nolek0/ScreenClip.git
+git clone https://github.com/Nolek0/ScreenClip.git && cd ScreenClip
 ```
 
 ```bash
-cd ScreenClip && ./build.sh
+./build.sh          # builds ScreenClip.app (universal: Apple Silicon + Intel)
 ```
-
-### 3. Installer et lancer
 
 ```bash
-cp -R ScreenClip.app /Applications/ && open /Applications/ScreenClip.app
+./build.sh --dmg    # also builds ScreenClip-<version>.dmg
 ```
-
-Au premier lancement, macOS affiche **« ScreenClip souhaite accéder aux fichiers de votre dossier Bureau »**. Clique sur **Autoriser** : c'est là que macOS enregistre tes captures.
-
-> 💡 Coche ensuite **Lancer au démarrage** dans le menu pour ne plus avoir à t'en occuper.
-
----
-
-## 🖱️ Utilisation
-
-1. Prends une capture comme d'habitude : **⌘⇧3** (écran entier), **⌘⇧4** (zone) ou **⌘⇧5** (outil complet).
-2. L'icône 📷 dans la barre des menus devient une ✅.
-3. Colle avec **⌘V**.
-
-### Le menu
-
-Clique sur l'icône 📷 dans la barre des menus :
-
-```
-ScreenClip
-Dossier : Desktop
-─────────────────────────────────────
-🕘 Historique                       ›
-─────────────────────────────────────
-✓ Copier automatiquement
-  Capture instantanée (sans vignette)
-✓ Copier au clic dans l'historique
-  Supprimer le fichier après copie
-  Lancer au démarrage
-─────────────────────────────────────
-Quitter ScreenClip                ⌘Q
-```
-
-| Option | Ce qu'elle fait |
-|---|---|
-| **Historique ›** | Ouvre la liste des dernières captures avec leur aperçu. |
-| **Copier automatiquement** | Met ScreenClip en pause ou la réactive. |
-| **Capture instantanée** | Supprime le délai d'environ 5 s de macOS avant l'enregistrement de la capture. |
-| **Copier au clic dans l'historique** | Coché : un clic copie la capture. Décoché : un clic l'ouvre dans Aperçu. |
-| **Supprimer le fichier après copie** | Envoie la capture à la Corbeille après la copie. Elle reste dans l'historique. |
-| **Lancer au démarrage** | Démarre ScreenClip à l'ouverture de session. L'app doit être dans `/Applications`. |
-
-### L'historique
-
-- Les **30 dernières** captures sont affichées dans le menu, les plus récentes en haut.
-- ScreenClip garde sa propre copie des **200 dernières** captures dans :
-  `~/Library/Application Support/ScreenClip/Historique`
-- En bas du sous-menu : **Ouvrir le dossier de l'historique** et **Vider l'historique** (les fichiers vont à la Corbeille).
-
----
-
-## ⚙️ Comment ça marche
-
-1. ScreenClip lit le dossier où macOS enregistre les captures (le Bureau par défaut, ou celui choisi dans ⌘⇧5 › Options). Si tu changes de dossier, elle s'en rend compte en environ 10 secondes.
-2. Elle surveille ce dossier. Quand un nouveau fichier apparaît, elle vérifie qu'il porte le marqueur que macOS ajoute à toutes les captures d'écran (`kMDItemIsScreenCapture`). Les autres fichiers que tu ajoutes au Bureau sont ignorés.
-3. L'image est mise dans le presse-papier, puis une copie est rangée dans l'historique.
-
-**Pourquoi il y a parfois un délai ?** Par défaut, macOS affiche une vignette en bas à droite pendant environ 5 secondes et n'enregistre le fichier qu'après. Active **Capture instantanée** pour le supprimer. Ça revient à décocher « Afficher la vignette flottante » dans ⌘⇧5 › Options.
-
----
-
-## 🛠️ Développement
 
 ```
 ScreenClip/
-├── main.swift      # App, barre des menus, surveillance du dossier, presse-papier
-├── History.swift   # Stockage de l'historique, miniatures, lignes d'aperçu du menu
-└── build.sh        # Compile et crée ScreenClip.app (signature ad hoc)
+├── main.swift              # App, menu bar, folder watching, clipboard
+├── History.swift           # History storage, thumbnails, preview menu rows
+├── scripts/make_icon.swift # Draws the app icon
+└── build.sh                # Builds the .app (ad-hoc signed) and the DMG
 ```
 
-- Pas de projet Xcode et aucune dépendance : seulement `swiftc`, AppKit et ServiceManagement.
-- `LSUIElement = true` dans l'`Info.plist` : c'est ce qui enlève l'icône du Dock.
-- Après une modification : `./build.sh`, puis recopie `ScreenClip.app` dans `/Applications`.
+- No Xcode project and no dependencies: just `swiftc`, AppKit and ServiceManagement.
+- `LSUIElement = true` in `Info.plist` is what hides the Dock icon.
+- The version number is set at the top of `build.sh`.
 
-> ⚠️ L'app est signée « ad hoc ». macOS peut donc redemander l'accès au Bureau après chaque recompilation. Clique simplement sur **Autoriser**.
+> ⚠️ The app is ad-hoc signed, so macOS may ask for Desktop access again after each rebuild. Just click **Allow**.
 
----
+## 🧹 Uninstall
 
-## 🧹 Désinstaller
-
-1. Menu 📷 › décoche **Lancer au démarrage**, puis **Quitter ScreenClip**.
-2. Supprime l'app et son historique :
+1. In the 📷 menu, untick **Launch at Login**, then **Quit ScreenClip**.
+2. Delete the app and its history:
 
 ```bash
 rm -rf /Applications/ScreenClip.app ~/Library/Application\ Support/ScreenClip
 ```
 
-3. Si tu avais activé **Capture instantanée** et que tu veux retrouver la vignette de macOS :
+3. If you turned on **Instant Capture** and want the macOS thumbnail back:
 
 ```bash
 defaults write com.apple.screencapture show-thumbnail -bool true
 ```
+
+## 📄 License
+
+[MIT](LICENSE)

@@ -127,7 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func flashIcon() {
-        statusItem.button?.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Copié")
+        statusItem.button?.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Copied")
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             self.statusItem.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "ScreenClip")
         }
@@ -141,25 +141,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         title.isEnabled = false
         menu.addItem(title)
         if let folder {
-            let f = NSMenuItem(title: "Dossier : \(folder.lastPathComponent)", action: nil, keyEquivalent: "")
+            let f = NSMenuItem(title: "Folder: \(folder.lastPathComponent)", action: nil, keyEquivalent: "")
             f.isEnabled = false
             menu.addItem(f)
         }
         menu.addItem(.separator())
-        let h = NSMenuItem(title: "Historique", action: nil, keyEquivalent: "")
+        let h = NSMenuItem(title: "History", action: nil, keyEquivalent: "")
         h.image = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil)
-        let sub = NSMenu(title: "Historique")  // new each rebuild: a submenu can only have one parent
+        let sub = NSMenu(title: "History")  // new each rebuild: a submenu can only have one parent
         sub.delegate = self
         h.submenu = sub
         menu.addItem(h)
         menu.addItem(.separator())
-        add(menu, "Copier automatiquement", #selector(toggleEnabled), enabled)
-        add(menu, "Capture instantanée (sans vignette)", #selector(toggleInstant), instantCapture)
-        add(menu, "Copier au clic dans l'historique", #selector(toggleClickToCopy), clickToCopy)
-        add(menu, "Supprimer le fichier après copie", #selector(toggleDelete), deleteAfterCopy)
-        add(menu, "Lancer au démarrage", #selector(toggleLogin), SMAppService.mainApp.status == .enabled)
+        add(menu, "Copy Automatically", #selector(toggleEnabled), enabled)
+        add(menu, "Instant Capture (No Thumbnail)", #selector(toggleInstant), instantCapture)
+        add(menu, "Click to Copy in History", #selector(toggleClickToCopy), clickToCopy)
+        add(menu, "Delete File After Copying", #selector(toggleDelete), deleteAfterCopy)
+        add(menu, "Launch at Login", #selector(toggleLogin), SMAppService.mainApp.status == .enabled)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quitter ScreenClip", action: #selector(NSApp.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: "Quit ScreenClip", action: #selector(NSApp.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
     }
 
@@ -176,22 +176,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: History submenu (filled each time it opens)
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        guard menu.title == "Historique" else { return }
+        guard menu.title == "History" else { return }
         menu.removeAllItems()
         let store = HistoryStore.shared
         store.reload()
         if store.shots.isEmpty {
-            let e = NSMenuItem(title: "Aucune capture pour l'instant", action: nil, keyEquivalent: "")
+            let e = NSMenuItem(title: "No screenshots yet", action: nil, keyEquivalent: "")
             e.isEnabled = false
             menu.addItem(e)
             return
         }
-        let header = NSMenuItem(title: clickToCopy ? "Clique sur une capture pour la copier" : "Clique sur une capture pour l'ouvrir",
+        let header = NSMenuItem(title: clickToCopy ? "Click a screenshot to copy it" : "Click a screenshot to open it",
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: "fr_FR")
+        fmt.locale = .current
         fmt.dateStyle = .short; fmt.timeStyle = .medium; fmt.doesRelativeDateFormatting = true
         for shot in store.shots.prefix(30) {
             let url = shot.url
@@ -202,10 +202,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(item)
         }
         menu.addItem(.separator())
-        let reveal = NSMenuItem(title: "Ouvrir le dossier de l'historique", action: #selector(openHistoryFolder), keyEquivalent: "")
+        let reveal = NSMenuItem(title: "Open History Folder", action: #selector(openHistoryFolder), keyEquivalent: "")
         reveal.target = self
         menu.addItem(reveal)
-        let clear = NSMenuItem(title: "Vider l'historique", action: #selector(clearHistory), keyEquivalent: "")
+        let clear = NSMenuItem(title: "Clear History", action: #selector(clearHistory), keyEquivalent: "")
         clear.target = self
         menu.addItem(clear)
     }
@@ -222,8 +222,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             else { try SMAppService.mainApp.register() }
         } catch {
             let a = NSAlert()
-            a.messageText = "Impossible de modifier le lancement au démarrage"
-            a.informativeText = "Place ScreenClip.app dans le dossier Applications puis réessaie.\n\(error.localizedDescription)"
+            a.messageText = "Couldn't change Launch at Login"
+            a.informativeText = "Move ScreenClip.app to your Applications folder and try again.\n\(error.localizedDescription)"
             a.runModal()
         }
         rebuildMenu()
