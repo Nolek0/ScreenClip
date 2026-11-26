@@ -59,7 +59,7 @@ On first launch, macOS asks **"ScreenClip would like to access files in your Des
 
 ### Updating
 
-You only install ScreenClip once. When a new version is out, the menu shows **Update x.y.z Available**. Click it, then **Update Now**: ScreenClip downloads the new version, replaces itself and restarts. You can also use **Check for Updates…** at any time.
+You only install ScreenClip once. When a new version is out, the menu shows **Update x.y.z Available**. Click it: ScreenClip downloads the new version, replaces itself and restarts. You can also click **Check for Updates…** at any time, and the menu reopens with the result.
 
 ## 🖱️ Usage
 
@@ -74,17 +74,23 @@ Click the 📷 icon in the menu bar:
 ```
 ScreenClip
 Folder: Desktop
-⬇ Update 1.2.0 Available          (only when there is one)
 ──────────────────────────────────
 🕘 History                       ›
 ──────────────────────────────────
-✓ Copy Automatically
-──────────────────────────────────
-⚙ Settings…                     ⌘,
 ↻ Check for Updates…
+──────────────────────────────────
+🎚 General                       ›
+     Copy screenshots automatically
+     Show screenshot thumbnail
+     Delete file after copying
+     Launch at login
+⚙ Settings…                     ⌘,
 ──────────────────────────────────
 Quit ScreenClip                ⌘Q
 ```
+
+- **Check for Updates…** shows the result right in the menu: **You're up to date.** or **Update x.y.z Available**. Click the update line to install it.
+- **General ›** gives one-click access to the everyday options. The language and the other options are in **Settings…**.
 
 ### Settings
 

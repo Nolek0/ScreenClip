@@ -2,7 +2,7 @@
 # Builds ScreenClip.app. Run ./build.sh --dmg to also create ScreenClip-<version>.dmg.
 set -e
 cd "$(dirname "$0")"
-VERSION="1.1.0"
+VERSION="1.1.1"
 APP=ScreenClip.app
 BUILD=build
 

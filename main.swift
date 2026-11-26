@@ -8,6 +8,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var known = Set<String>()
     weak var historyMenu: NSMenu?
     var cancellables = Set<AnyCancellable>()
+    /// Set when the user picks "Check for Updates…": the menu reopens to show the result.
+    var manualCheck = false
     let defaults = UserDefaults.standard
 
     var enabled: Bool {
@@ -31,8 +33,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.rebuildMenu()
             SettingsWindow.shared.refreshTitle()
         }
-        Updater.shared.$status.receive(on: RunLoop.main).sink { [weak self] _ in
-            DispatchQueue.main.async { self?.rebuildMenu() }
+        Updater.shared.$status.receive(on: RunLoop.main).sink { [weak self] status in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.rebuildMenu()
+                if self.manualCheck, status != .checking {
+                    self.manualCheck = false
+                    self.statusItem.button?.performClick(nil)  // show the result right in the menu bar
+                }
+            }
         }.store(in: &cancellables)
 
         // Re-check the screenshot folder periodically in case the user changes it.
@@ -141,11 +150,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             f.isEnabled = false
             menu.addItem(f)
         }
-        if Updater.shared.status == .available, let v = Updater.shared.latest?.version {
-            let u = item(Lf("Update %@ Available", v), #selector(showUpdates))
-            u.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
-            menu.addItem(u)
-        }
         menu.addItem(.separator())
 
         let h = NSMenuItem(title: L("History"), action: nil, keyEquivalent: "")
@@ -157,17 +161,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(h)
         menu.addItem(.separator())
 
-        let auto = item(L("Copy Automatically"), #selector(toggleEnabled))
-        auto.state = enabled ? .on : .off
-        menu.addItem(auto)
+        menu.addItem(updateItem())
         menu.addItem(.separator())
 
+        // Quick general settings (language stays in the Settings window).
+        let g = NSMenuItem(title: L("General"), action: nil, keyEquivalent: "")
+        g.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
+        let gm = NSMenu(title: L("General"))
+        let auto = item(L("Copy screenshots automatically"), #selector(toggleEnabled))
+        auto.state = enabled ? .on : .off
+        gm.addItem(auto)
+        let thumb = item(L("Show screenshot thumbnail"), #selector(toggleThumbnail))
+        thumb.state = Prefs.showThumbnail ? .on : .off
+        thumb.toolTip = L("macOS shows the preview in the corner, but copying waits about 5 seconds.")
+        gm.addItem(thumb)
+        let del = item(L("Delete file after copying"), #selector(toggleDeleteAfterCopy))
+        del.state = deleteAfterCopy ? .on : .off
+        gm.addItem(del)
+        let login = item(L("Launch at login"), #selector(toggleLogin))
+        login.state = Prefs.launchAtLogin ? .on : .off
+        gm.addItem(login)
+        g.submenu = gm
+        menu.addItem(g)
         let settings = item(L("Settings…"), #selector(showSettings), key: ",")
         settings.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: nil)
         menu.addItem(settings)
-        let upd = item(L("Check for Updates…"), #selector(checkForUpdates))
-        upd.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
-        menu.addItem(upd)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: L("Quit ScreenClip"), action: #selector(NSApp.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
@@ -181,10 +199,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc func toggleEnabled() { enabled.toggle() }
     @objc func showSettings() { SettingsWindow.shared.show() }
-    @objc func showUpdates() { SettingsWindow.shared.show(.updates) }
+    @objc func toggleThumbnail() { Prefs.showThumbnail.toggle(); rebuildMenu() }
+    @objc func toggleDeleteAfterCopy() { defaults.set(!deleteAfterCopy, forKey: "deleteAfterCopy") }
+    @objc func toggleLogin() { Prefs.setLaunchAtLogin(!Prefs.launchAtLogin); rebuildMenu() }
     @objc func checkForUpdates() {
-        SettingsWindow.shared.show(.updates)
+        manualCheck = true
         Updater.shared.check()
+    }
+    @objc func installUpdate() { Updater.shared.install() }
+
+    /// The update line of the menu: its text and action follow the updater's state.
+    func updateItem() -> NSMenuItem {
+        let u = Updater.shared
+        let i: NSMenuItem
+        switch u.status {
+        case .idle:
+            i = item(L("Check for Updates…"), #selector(checkForUpdates))
+            i.image = NSImage(systemSymbolName: "arrow.triangle.2.circlepath", accessibilityDescription: nil)
+        case .checking, .downloading, .installing:
+            let text = u.status == .checking ? L("Checking…") : (u.status == .downloading ? L("Downloading…") : L("Installing…"))
+            i = NSMenuItem(title: text, action: nil, keyEquivalent: "")
+            i.isEnabled = false
+            i.image = NSImage(systemSymbolName: "hourglass", accessibilityDescription: nil)
+        case .upToDate:
+            i = item(L("You're up to date."), #selector(checkForUpdates))
+            i.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(paletteColors: [.systemGreen]))
+            if #available(macOS 14.4, *) { i.subtitle = Lf("Version %@", Updater.currentVersion) }
+        case .available:
+            i = item(Lf("Update %@ Available", u.latest?.version ?? ""), #selector(installUpdate))
+            i.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(paletteColors: [.systemBlue]))
+            if #available(macOS 14.4, *) { i.subtitle = L("Update Now") }
+        case .failed(let msg):
+            i = item(msg, #selector(checkForUpdates))
+            i.image = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(paletteColors: [.systemOrange]))
+            if #available(macOS 14.4, *) { i.subtitle = L("Check Now") }
+        }
+        return i
     }
 
     // MARK: History submenu (filled each time it opens)
