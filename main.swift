@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var known = Set<String>()
     weak var historyMenu: NSMenu?
     var cancellables = Set<AnyCancellable>()
+    var clipboardProvider: ClipboardImage?
     /// Set when the user picks "Check for Updates…": the menu reopens to show the result.
     var manualCheck = false
     let defaults = UserDefaults.standard
@@ -47,7 +48,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Re-check the screenshot folder periodically in case the user changes it.
         Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             guard let self else { return }
-            if Prefs.screenshotFolder() != self.folder { self.startWatching() }
+            // Also retry if watching never started (e.g. Desktop access granted after launch).
+            if self.source == nil || Prefs.screenshotFolder() != self.folder { self.startWatching() }
         }
         if autoCheckUpdates {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3) { Updater.shared.check(silent: true) }
@@ -65,15 +67,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: Folder watching
 
-    func listFiles() -> Set<String> {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+    /// nil when the folder can't be read (e.g. Desktop access not granted yet).
+    func listFiles() -> Set<String>? {
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: folder.path) else { return nil }
         return Set(names.filter { !$0.hasPrefix(".") })
     }
 
     func startWatching() {
         source?.cancel()
         folder = Prefs.screenshotFolder()
-        known = listFiles()
+        // Not readable yet: try again on the next timer tick rather than treating every file as new.
+        guard let files = listFiles() else { source = nil; rebuildMenu(); return }
+        known = files
+        source = nil
         let fd = open(folder.path, O_EVTONLY)
         guard fd >= 0 else { return }
         let s = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: .write, queue: .main)
@@ -85,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func folderChanged() {
-        let now = listFiles()
+        guard let now = listFiles() else { return }
         let added = now.subtracting(known)
         known = now
         guard enabled else { return }
@@ -121,13 +127,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Puts the image on the clipboard. Also used by the history menu.
+    /// Puts PNG data on the clipboard. A TIFF version (some older apps want it) is only built if an app asks
+    /// for it, so ScreenClip never keeps a big uncompressed copy of every screenshot in memory.
     func writeImage(_ url: URL) -> Bool {
-        guard let image = NSImage(contentsOf: url), image.isValid else { return false }
-        let pb = NSPasteboard.general
-        pb.clearContents()
-        pb.writeObjects([image])
-        flashIcon()
-        return true
+        let ok: Bool = autoreleasepool {
+            guard let png = ClipboardImage.pngData(from: url) else { return false }
+            let item = NSPasteboardItem()
+            item.setData(png, forType: .png)
+            let provider = ClipboardImage(png: png)
+            item.setDataProvider(provider, forTypes: [.tiff])
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            guard pb.writeObjects([item]) else { return false }
+            clipboardProvider = provider
+            return true
+        }
+        if ok { flashIcon() }
+        return ok
     }
 
     func flashIcon() {
@@ -242,6 +258,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: History submenu (filled each time it opens)
 
+    /// Free the previews as soon as the History menu closes.
+    func menuDidClose(_ menu: NSMenu) {
+        guard menu === historyMenu else { return }
+        DispatchQueue.main.async {
+            // Keep one placeholder so the submenu still opens (and gets refilled) next time.
+            menu.removeAllItems()
+            menu.addItem(NSMenuItem(title: L("History"), action: nil, keyEquivalent: ""))
+            Thumbs.cache.removeAllObjects()
+        }
+    }
+
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu === historyMenu else { return }
         menu.removeAllItems()
@@ -328,6 +355,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         HistoryStore.shared.clear(permanently: permanentDelete)
     }
+}
+
+/// Lazily turns the PNG into TIFF only when an app pastes asking for TIFF.
+final class ClipboardImage: NSObject, NSPasteboardItemDataProvider {
+    private var png: Data?
+    init(png: Data) { self.png = png }
+
+    static func pngData(from url: URL) -> Data? {
+        if url.pathExtension.lowercased() == "png", let d = try? Data(contentsOf: url) { return d }
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }
+        return NSBitmapImageRep(cgImage: cg).representation(using: .png, properties: [:])
+    }
+
+    func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem, provideDataForType type: NSPasteboard.PasteboardType) {
+        autoreleasepool {
+            guard let png, let rep = NSBitmapImageRep(data: png),
+                  let tiff = rep.tiffRepresentation(using: .lzw, factor: 0) else { return }
+            item.setData(tiff, forType: type)
+        }
+    }
+
+    func pasteboardFinishedWithDataProvider(_ pasteboard: NSPasteboard) { png = nil }
 }
 
 let app = NSApplication.shared

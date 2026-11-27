@@ -91,6 +91,10 @@ final class SettingsWindow {
             w.contentViewController = NSHostingController(rootView: SettingsView())
             w.center()
             window = w
+            // Free the whole window (and its SwiftUI views) once it's closed.
+            NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: w, queue: .main) { [weak self] _ in
+                DispatchQueue.main.async { self?.window?.contentViewController = nil; self?.window = nil }
+            }
         }
         window?.title = L("ScreenClip Settings")
         NSApp.activate(ignoringOtherApps: true)

@@ -130,8 +130,13 @@ final class HistoryStore: ObservableObject {
 }
 
 enum Thumbs {
-    static let cache = NSCache<NSURL, NSImage>()
-    static func load(_ url: URL, size: Int = 600) -> NSImage? {
+    static let cache: NSCache<NSURL, NSImage> = {
+        let c = NSCache<NSURL, NSImage>()
+        c.countLimit = 60
+        return c
+    }()
+    /// 2x the on-screen preview size (252 pt wide), no bigger.
+    static func load(_ url: URL, size: Int = 504) -> NSImage? {
         if let c = cache.object(forKey: url as NSURL) { return c }
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
