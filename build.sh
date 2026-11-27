@@ -2,7 +2,7 @@
 # Builds ScreenClip.app. Run ./build.sh --dmg to also create ScreenClip-<version>.dmg.
 set -e
 cd "$(dirname "$0")"
-VERSION="1.3.0"
+VERSION="1.3.1"
 APP=ScreenClip.app
 BUILD=build
 
@@ -47,7 +47,15 @@ cat > $APP/Contents/Info.plist <<PLIST
   <key>NSDownloadsFolderUsageDescription</key><string>ScreenClip watches this folder to copy new screenshots to the clipboard.</string>
 </dict></plist>
 PLIST
-codesign --force --sign - $APP
+# Sign with the same certificate every time so macOS keeps Desktop / Screen Recording permissions
+# across updates. Falls back to an ad-hoc signature on machines without it.
+SIGN_ID=$(security find-identity -p codesigning | awk -F'"' '/"ScreenClip Signing"/ {print $0}' | awk '{print $2}' | head -1)
+if [[ -n "$SIGN_ID" ]]; then
+  codesign --force --sign "$SIGN_ID" $APP
+else
+  echo "warning: 'ScreenClip Signing' certificate not found, using ad-hoc signature"
+  codesign --force --sign - $APP
+fi
 echo "Built $APP ($VERSION)"
 
 if [[ "$1" == "--dmg" ]]; then

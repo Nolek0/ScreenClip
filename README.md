@@ -180,7 +180,7 @@ ScreenClip/
 - `LSUIElement = true` in `Info.plist` is what hides the Dock icon.
 - The version number is set at the top of `build.sh`.
 
-> ⚠️ The app is ad-hoc signed, so macOS may ask for Desktop access again after each rebuild. Just click **Allow**.
+> 🔏 Release builds are signed with a self-signed **ScreenClip Signing** certificate, so macOS keeps the Desktop and Screen Recording permissions across updates. Without that certificate in your keychain, `build.sh` falls back to an ad-hoc signature, and macOS will ask for permissions again after each rebuild.
 
 ## 🧹 Uninstall
 
