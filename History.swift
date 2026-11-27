@@ -1,5 +1,11 @@
+import AVFoundation
 import Cocoa
 import ImageIO
+
+enum Media {
+    static let videoExtensions: Set<String> = ["mov", "mp4", "m4v"]
+    static func isVideo(_ url: URL) -> Bool { videoExtensions.contains(url.pathExtension.lowercased()) }
+}
 
 // MARK: Storage
 
@@ -41,12 +47,15 @@ final class HistoryStore: ObservableObject {
     func add(_ source: URL) {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd 'at' HH.mm.ss"
-        var dest = dir.appendingPathComponent("Screenshot \(f.string(from: Date())).\(source.pathExtension)")
+        let kind = Media.isVideo(source) ? "Screen Recording" : "Screenshot"
+        var dest = dir.appendingPathComponent("\(kind) \(f.string(from: Date())).\(source.pathExtension)")
         var n = 2
         while FileManager.default.fileExists(atPath: dest.path) {
-            dest = dir.appendingPathComponent("Screenshot \(f.string(from: Date())) (\(n)).\(source.pathExtension)"); n += 1
+            dest = dir.appendingPathComponent("\(kind) \(f.string(from: Date())) (\(n)).\(source.pathExtension)"); n += 1
         }
-        guard (try? FileManager.default.copyItem(at: source, to: dest)) != nil else { return }
+        // Videos are big: a hard link keeps them in the history without using any extra disk space.
+        let linked = Media.isVideo(source) && (try? FileManager.default.linkItem(at: source, to: dest)) != nil
+        guard linked || (try? FileManager.default.copyItem(at: source, to: dest)) != nil else { return }
         Self.setOriginal(source, of: dest)
         reload()
         for old in shots.dropFirst(Self.maxItems) { try? FileManager.default.removeItem(at: old.url) }
@@ -75,8 +84,10 @@ final class HistoryStore: ObservableObject {
         return URL(fileURLWithPath: path)
     }
 
+    /// A macOS screenshot, or a ScreenClip screen recording.
     static func isScreenshot(_ url: URL) -> Bool {
         getxattr(url.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) > 0
+            || getxattr(url.path, Recorder.recordingAttr, nil, 0, 0, 0) > 0
     }
 
     /// Screenshots currently in the screenshot folder, grouped by file size.
@@ -130,6 +141,13 @@ final class HistoryStore: ObservableObject {
 }
 
 enum Thumbs {
+    /// "▶ 1:23" for videos, nil for images.
+    static func duration(_ url: URL) -> String? {
+        guard Media.isVideo(url) else { return nil }
+        let s = Int(CMTimeGetSeconds(AVURLAsset(url: url).duration).rounded())
+        return String(format: "▶ %d:%02d", s / 60, s % 60)
+    }
+
     static let cache: NSCache<NSURL, NSImage> = {
         let c = NSCache<NSURL, NSImage>()
         c.countLimit = 60
@@ -138,6 +156,15 @@ enum Thumbs {
     /// 2x the on-screen preview size (252 pt wide), no bigger.
     static func load(_ url: URL, size: Int = 504) -> NSImage? {
         if let c = cache.object(forKey: url as NSURL) { return c }
+        if Media.isVideo(url) {
+            let gen = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            gen.appliesPreferredTrackTransform = true
+            gen.maximumSize = CGSize(width: size, height: size)
+            guard let cg = try? gen.copyCGImage(at: CMTime(seconds: 0.2, preferredTimescale: 600), actualTime: nil) else { return nil }
+            let img = NSImage(cgImage: cg, size: .zero)
+            cache.setObject(img, forKey: url as NSURL)
+            return img
+        }
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
               let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -175,7 +202,7 @@ final class ShotMenuView: NSView {
     static let width: CGFloat = 280, previewH: CGFloat = 150
     private var previewFrame: NSRect { NSRect(x: 14, y: 26, width: Self.width - 28, height: Self.previewH) }
 
-    init(image: NSImage?, title: String, onClick: @escaping () -> Void) {
+    init(image: NSImage?, title: String, badge: String? = nil, onClick: @escaping () -> Void) {
         self.onClick = onClick
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.previewH + 34))
         let iv = NSImageView(frame: previewFrame)
@@ -186,6 +213,18 @@ final class ShotMenuView: NSView {
         iv.layer?.masksToBounds = true
         iv.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.15).cgColor
         addSubview(iv)
+        if let badge {  // video: duration pill in the corner of the preview
+            let pill = NSTextField(labelWithString: badge)
+            pill.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+            pill.textColor = .white
+            pill.alignment = .center
+            pill.wantsLayer = true
+            pill.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.65).cgColor
+            pill.layer?.cornerRadius = 5
+            let w = pill.intrinsicContentSize.width + 12
+            pill.frame = NSRect(x: previewFrame.maxX - w - 6, y: previewFrame.minY + 6, width: w, height: 18)
+            addSubview(pill)
+        }
         overlay.frame = previewFrame
         overlay.isHidden = true
         addSubview(overlay)

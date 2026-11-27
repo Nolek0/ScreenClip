@@ -205,6 +205,8 @@ struct GeneralPane: View {
     @AppStorage("language") private var language = "system"
     @AppStorage("enabled") private var enabled = true
     @AppStorage("deleteAfterCopy") private var deleteAfterCopy = false
+    @AppStorage("recordingEnabled") private var recordingEnabled = true
+    @AppStorage("recordHotkey") private var hotkey = 0
     @State private var showThumb = Prefs.showThumbnail
     @State private var login = Prefs.launchAtLogin
     @State private var folder = Prefs.screenshotFolder()
@@ -234,6 +236,15 @@ struct GeneralPane: View {
                         Button(L("Show in Finder")) { NSWorkspace.shared.open(folder) }
                     }
                 }
+            }
+            Section(L("Screen Recording")) {
+                DetailToggle(title: L("Record the screen with a shortcut"),
+                             detail: Lf("Press %@ to start recording the screen, and again to stop. The video goes to your clipboard and history.", HotKey.presets[hotkey].label),
+                             isOn: $recordingEnabled)
+                Picker(L("Shortcut"), selection: $hotkey) {
+                    ForEach(HotKey.presets.indices, id: \.self) { Text(HotKey.presets[$0].label).tag($0) }
+                }
+                .disabled(!recordingEnabled)
             }
             Section(L("App")) {
                 Toggle(L("Launch at login"), isOn: $login)

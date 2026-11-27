@@ -24,6 +24,7 @@ ScreenClip is a tiny macOS app that runs quietly in the background. It has no Do
 | | Feature | Details |
 |---|---|---|
 | 📋 | **Auto-copy** | Every screenshot (⌘⇧3, ⌘⇧4, ⌘⇧5) goes straight to the clipboard. |
+| 🎥 | **Screen recording** | Press **⌘⇧7** to start recording the screen, again to stop. The video goes to your clipboard (paste it with ⌘V) and to the history. |
 | 🕘 | **History** | A submenu shows your last 30 screenshots with a large preview. Click one to copy it again, or right-click it to AirDrop it, show it in Finder, open or delete it. |
 | ⚡ | **Thumbnail on/off** | Show or hide the macOS corner thumbnail. Hiding it makes copying instant (it delays saving by about 5 seconds). |
 | 🗑️ | **Delete After Copying** | Moves the file to the Trash once copied, so your Desktop stays clean. |
@@ -67,6 +68,17 @@ You only install ScreenClip once. When a new version is out, the menu shows **Up
 2. The 📷 icon in the menu bar briefly turns into a ✅.
 3. Paste with **⌘V**.
 
+### Screen recording
+
+1. Press **⌘⇧7**. Recording starts right away and the menu bar icon turns into a red dot with a timer (`● 0:12`).
+2. Press **⌘⇧7** again to stop. The video is saved next to your screenshots, copied to the clipboard as a file, and added to the history with a `▶ 0:12` badge.
+3. Paste it with **⌘V** in Messages, Mail, Discord, Finder…
+
+- It records the screen your mouse is on, with the cursor, without sound (H.264, 30 fps, up to 2560 px wide).
+- The first time, macOS asks for **Screen Recording** permission. Allow ScreenClip in **System Settings › Privacy & Security › Screen & System Audio Recording**.
+- Change the shortcut (⌘⇧7, ⌘⇧8, ⌘⇧9, ⌃⌥⌘R or ⌥⇧R) or turn the feature off in **Settings › General › Screen Recording**.
+- Light on memory: frames go straight from the screen to the Mac's hardware video encoder and onto disk. The clipboard only holds a link to the file, and the history keeps the video without duplicating it on disk.
+
 ### The menu
 
 Click the 📷 icon in the menu bar:
@@ -74,6 +86,8 @@ Click the 📷 icon in the menu bar:
 ```
 ScreenClip
 Folder: Desktop
+──────────────────────────────────
+⏺ Start Recording              ⌘⇧7
 ──────────────────────────────────
 🕘 History                       ›
 ──────────────────────────────────
@@ -83,6 +97,7 @@ Folder: Desktop
      Copy screenshots automatically
      Show screenshot thumbnail
      Delete file after copying
+     Record the screen with a shortcut
      Launch at login
 ⚙ Settings…                     ⌘,
 ──────────────────────────────────
@@ -98,7 +113,7 @@ Open **Settings…** from the menu (or open ScreenClip again from your Applicati
 
 | Tab | Options |
 |---|---|
-| **General** | Language · Copy screenshots automatically · Show screenshot thumbnail · Delete file after copying · Screenshot folder · Launch at login |
+| **General** | Language · Copy screenshots automatically · Show screenshot thumbnail · Delete file after copying · Screenshot folder · Screen recording on/off and shortcut · Launch at login |
 | **History** | Click to copy (off: opens in Preview) · Screenshots shown in the menu (10–50) · Saved screenshot count · Skip Trash when clearing · Clear History |
 | **Updates** | Current version · Check Now · What's new · Update Now · Check automatically at launch |
 | **About** | Version, link to GitHub |
@@ -154,6 +169,8 @@ ScreenClip/
 ├── History.swift           # History storage, thumbnails, preview menu rows
 ├── Settings.swift          # Settings window (SwiftUI)
 ├── Updater.swift           # GitHub Releases update check and self-install
+├── Recorder.swift          # Screen recording (ScreenCaptureKit + hardware H.264)
+├── HotKey.swift            # Global recording shortcut
 ├── Localization.swift      # The 10 languages
 ├── scripts/make_icon.swift # Draws the app icon
 └── build.sh                # Builds the .app (ad-hoc signed) and the DMG

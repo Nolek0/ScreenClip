@@ -7,6 +7,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var folder: URL!
     var known = Set<String>()
     weak var historyMenu: NSMenu?
+    /// The menu bar menu is open: never rebuild it then (that's what left History empty).
+    var menuIsOpen = false
+    var needsRebuild = false
     var cancellables = Set<AnyCancellable>()
     var clipboardProvider: ClipboardImage?
     /// Set when the user picks "Check for Updates…": the menu reopens to show the result.
@@ -22,16 +25,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var deleteAfterCopy: Bool { defaults.bool(forKey: "deleteAfterCopy") }
     var historyMenuCount: Int { defaults.object(forKey: "historyMenuCount") as? Int ?? 30 }
     var autoCheckUpdates: Bool { defaults.object(forKey: "autoCheckUpdates") as? Bool ?? true }
+    var recordingEnabled: Bool {
+        get { defaults.object(forKey: "recordingEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "recordingEnabled") }
+    }
+    var recTimer: Timer?
 
     func applicationDidFinishLaunching(_ n: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "ScreenClip")
         startWatching()
         rebuildMenu()
+        setupRecording()
 
         // Settings (incl. language) can change from the Settings window: keep the menu in sync.
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.rebuildMenu()
+            self?.applyHotkey()
             SettingsWindow.shared.refreshTitle()
         }
         Updater.shared.$status.receive(on: RunLoop.main).sink { [weak self] status in
@@ -130,6 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Puts PNG data on the clipboard. A TIFF version (some older apps want it) is only built if an app asks
     /// for it, so ScreenClip never keeps a big uncompressed copy of every screenshot in memory.
     func writeImage(_ url: URL) -> Bool {
+        if Media.isVideo(url) { return writeFile(url) }
         let ok: Bool = autoreleasepool {
             guard let png = ClipboardImage.pngData(from: url) else { return false }
             let item = NSPasteboardItem()
@@ -146,18 +157,99 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return ok
     }
 
+    /// Videos go on the clipboard as a file (like ⌘C in Finder): pasting works in Messages, Mail, Discord, Finder…
+    /// and the video itself is never loaded into memory.
+    func writeFile(_ url: URL) -> Bool {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        guard pb.writeObjects([url as NSURL]) else { return false }
+        flashIcon()
+        return true
+    }
+
     func flashIcon() {
         statusItem.button?.image = NSImage(systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Copied")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.statusItem.button?.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "ScreenClip")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.updateRecordingIndicator() }
+    }
+
+    // MARK: Screen recording
+
+    func setupRecording() {
+        Recorder.shared.onFinished = { [weak self] url in self?.recordingFinished(url) }
+        Recorder.shared.onError = { [weak self] _ in self?.recordingFailed() }
+        HotKey.shared.onPress = { [weak self] in
+            guard let self, self.recordingEnabled || Recorder.shared.isRecording else { return }
+            Recorder.shared.toggle()
+        }
+        applyHotkey()
+        Recorder.shared.$isRecording.receive(on: RunLoop.main).sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateRecordingIndicator(); self?.rebuildMenu() }
+        }.store(in: &cancellables)
+    }
+
+    private var registeredHotkey: String?
+    func applyHotkey() {
+        let want = recordingEnabled ? HotKey.currentPreset.label : nil
+        guard want != registeredHotkey else { return }
+        registeredHotkey = want
+        if want != nil { HotKey.shared.register(HotKey.currentPreset) }
+        else if !Recorder.shared.isRecording { HotKey.shared.unregister() }
+    }
+
+    /// Menu bar icon: a red dot and a timer while recording, the camera otherwise.
+    func updateRecordingIndicator() {
+        guard let button = statusItem.button else { return }
+        if Recorder.shared.isRecording {
+            let red = NSImage.SymbolConfiguration(paletteColors: [.systemRed])
+            button.image = NSImage(systemSymbolName: "record.circle.fill", accessibilityDescription: "Recording")?
+                .withSymbolConfiguration(red)
+            button.imagePosition = .imageLeading
+            let tick = { [weak self] in
+                guard let start = Recorder.shared.startDate else { return }
+                let s = Int(Date().timeIntervalSince(start))
+                self?.statusItem.button?.title = String(format: " %d:%02d", s / 60, s % 60)
+            }
+            tick()
+            if recTimer == nil { recTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in tick() } }
+        } else {
+            recTimer?.invalidate(); recTimer = nil
+            button.title = ""
+            button.image = NSImage(systemSymbolName: "camera.viewfinder", accessibilityDescription: "ScreenClip")
         }
     }
+
+    func recordingFinished(_ url: URL?) {
+        updateRecordingIndicator()
+        guard let url else { return }
+        HistoryStore.shared.add(url)
+        _ = writeFile(url)
+        if deleteAfterCopy { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+    }
+
+    func recordingFailed() {
+        updateRecordingIndicator()
+        NSApp.activate(ignoringOtherApps: true)
+        let a = NSAlert()
+        a.messageText = L("Screen recording permission needed")
+        a.informativeText = L("Allow ScreenClip in System Settings › Privacy & Security › Screen & System Audio Recording, then try again.")
+        a.addButton(withTitle: L("Open System Settings"))
+        a.addButton(withTitle: L("Cancel"))
+        if a.runModal() == .alertFirstButtonReturn,
+           let u = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(u)
+        }
+    }
+
+    @objc func toggleRecording() { Recorder.shared.toggle() }
+    @objc func toggleRecordingEnabled() { recordingEnabled.toggle() }
 
     // MARK: Menu
 
     func rebuildMenu() {
         guard statusItem != nil else { return }
+        if menuIsOpen { needsRebuild = true; return }
         let menu = NSMenu()
+        menu.delegate = self
         let title = NSMenuItem(title: "ScreenClip", action: nil, keyEquivalent: "")
         title.isEnabled = false
         menu.addItem(title)
@@ -167,10 +259,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             menu.addItem(f)
         }
         menu.addItem(.separator())
+        if Recorder.shared.isRecording {
+            let r = item(L("Stop Recording"), #selector(toggleRecording))
+            r.image = NSImage(systemSymbolName: "stop.circle.fill", accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(paletteColors: [.systemRed]))
+            if #available(macOS 14.4, *) { r.subtitle = HotKey.currentPreset.label }
+            menu.addItem(r)
+            menu.addItem(.separator())
+        } else if recordingEnabled {
+            let r = item(L("Start Recording"), #selector(toggleRecording))
+            r.image = NSImage(systemSymbolName: "record.circle", accessibilityDescription: nil)
+            if #available(macOS 14.4, *) { r.subtitle = HotKey.currentPreset.label }
+            menu.addItem(r)
+            menu.addItem(.separator())
+        }
 
         let h = NSMenuItem(title: L("History"), action: nil, keyEquivalent: "")
         h.image = NSImage(systemSymbolName: "clock.arrow.circlepath", accessibilityDescription: nil)
-        let sub = NSMenu(title: L("History"))  // new each rebuild: a submenu can only have one parent
+        let sub = HistoryMenu(title: L("History"))  // new each rebuild: a submenu can only have one parent
         sub.delegate = self
         h.submenu = sub
         historyMenu = sub
@@ -194,6 +300,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let del = item(L("Delete file after copying"), #selector(toggleDeleteAfterCopy))
         del.state = deleteAfterCopy ? .on : .off
         gm.addItem(del)
+        let rec = item(L("Record the screen with a shortcut"), #selector(toggleRecordingEnabled))
+        rec.state = recordingEnabled ? .on : .off
+        gm.addItem(rec)
         let login = item(L("Launch at login"), #selector(toggleLogin))
         login.state = Prefs.launchAtLogin ? .on : .off
         gm.addItem(login)
@@ -259,18 +368,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: History submenu (filled each time it opens)
 
     /// Free the previews as soon as the History menu closes.
+    func menuWillOpen(_ menu: NSMenu) {
+        if menu === statusItem.menu { menuIsOpen = true }
+    }
+
     func menuDidClose(_ menu: NSMenu) {
-        guard menu === historyMenu else { return }
+        guard menu === statusItem.menu else { return }
+        menuIsOpen = false
+        // Once everything is closed (and any clicked action has run), free the previews
+        // and apply changes that came in while the menu was open.
         DispatchQueue.main.async {
-            // Keep one placeholder so the submenu still opens (and gets refilled) next time.
-            menu.removeAllItems()
-            menu.addItem(NSMenuItem(title: L("History"), action: nil, keyEquivalent: ""))
+            guard !self.menuIsOpen else { return }
+            if let h = self.historyMenu {
+                h.removeAllItems()
+                h.addItem(NSMenuItem(title: L("History"), action: nil, keyEquivalent: ""))  // refilled on open
+            }
             Thumbs.cache.removeAllObjects()
+            if self.needsRebuild { self.needsRebuild = false; self.rebuildMenu() }
         }
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
-        guard menu === historyMenu else { return }
+        guard menu is HistoryMenu else { return }
         menu.removeAllItems()
         let store = HistoryStore.shared
         store.reload()
@@ -303,7 +422,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for shot in store.shots.prefix(historyMenuCount) {
             let url = shot.url
             let row = NSMenuItem()
-            let view = ShotMenuView(image: Thumbs.load(url), title: fmt.string(from: shot.date)) { [weak self] in
+            let view = ShotMenuView(image: Thumbs.load(url), title: fmt.string(from: shot.date), badge: Thumbs.duration(url)) { [weak self] in
                 self?.historyClicked(url)
             }
             view.actions = shotActions(url)
@@ -379,6 +498,9 @@ final class ClipboardImage: NSObject, NSPasteboardItemDataProvider {
 
     func pasteboardFinishedWithDataProvider(_ pasteboard: NSPasteboard) { png = nil }
 }
+
+/// The History submenu, recognised by its class (never by a reference that a rebuild could replace).
+final class HistoryMenu: NSMenu {}
 
 let app = NSApplication.shared
 let delegate = AppDelegate()

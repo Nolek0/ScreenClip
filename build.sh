@@ -2,7 +2,7 @@
 # Builds ScreenClip.app. Run ./build.sh --dmg to also create ScreenClip-<version>.dmg.
 set -e
 cd "$(dirname "$0")"
-VERSION="1.2.2"
+VERSION="1.3.0"
 APP=ScreenClip.app
 BUILD=build
 
@@ -12,7 +12,7 @@ mkdir -p $APP/Contents/MacOS $APP/Contents/Resources $BUILD
 # Universal binary (Apple Silicon + Intel).
 for arch in arm64 x86_64; do
   swiftc -O -target $arch-apple-macos13.0 *.swift \
-    -o $BUILD/ScreenClip-$arch -framework Cocoa -framework ServiceManagement
+    -o $BUILD/ScreenClip-$arch -framework Cocoa -framework ServiceManagement -framework ScreenCaptureKit -framework AVFoundation -framework CoreMedia -framework Carbon
 done
 lipo -create $BUILD/ScreenClip-arm64 $BUILD/ScreenClip-x86_64 -output $APP/Contents/MacOS/ScreenClip
 
@@ -41,6 +41,7 @@ cat > $APP/Contents/Info.plist <<PLIST
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHumanReadableCopyright</key><string>MIT License</string>
+  <key>NSScreenCaptureUsageDescription</key><string>ScreenClip records your screen when you press the recording shortcut.</string>
   <key>NSDesktopFolderUsageDescription</key><string>ScreenClip watches your Desktop to copy new screenshots to the clipboard.</string>
   <key>NSDocumentsFolderUsageDescription</key><string>ScreenClip watches this folder to copy new screenshots to the clipboard.</string>
   <key>NSDownloadsFolderUsageDescription</key><string>ScreenClip watches this folder to copy new screenshots to the clipboard.</string>
