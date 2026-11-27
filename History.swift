@@ -47,23 +47,82 @@ final class HistoryStore: ObservableObject {
             dest = dir.appendingPathComponent("Screenshot \(f.string(from: Date())) (\(n)).\(source.pathExtension)"); n += 1
         }
         guard (try? FileManager.default.copyItem(at: source, to: dest)) != nil else { return }
+        Self.setOriginal(source, of: dest)
         reload()
         for old in shots.dropFirst(Self.maxItems) { try? FileManager.default.removeItem(at: old.url) }
         if shots.count > Self.maxItems { reload() }
     }
 
-    func delete(_ url: URL, permanently: Bool) {
+    // MARK: Deleting (history copy + the original screenshot file)
+
+    /// Setting: deleting from the history also deletes the original screenshot (on by default).
+    static var deleteOriginals: Bool { UserDefaults.standard.object(forKey: "deleteOriginals") as? Bool ?? true }
+
+    private static let originalAttr = "com.screenclip.original"
+
+    /// Remembers where the screenshot came from, as an extended attribute on the history copy.
+    static func setOriginal(_ original: URL, of copy: URL) {
+        let data = Array(original.path.utf8)
+        _ = setxattr(copy.path, originalAttr, data, data.count, 0, 0)
+    }
+
+    static func recordedOriginal(of copy: URL) -> URL? {
+        let size = getxattr(copy.path, originalAttr, nil, 0, 0, 0)
+        guard size > 0 else { return nil }
+        var buf = [UInt8](repeating: 0, count: size)
+        guard getxattr(copy.path, originalAttr, &buf, size, 0, 0) == size,
+              let path = String(bytes: buf, encoding: .utf8) else { return nil }
+        return URL(fileURLWithPath: path)
+    }
+
+    static func isScreenshot(_ url: URL) -> Bool {
+        getxattr(url.path, "com.apple.metadata:kMDItemIsScreenCapture", nil, 0, 0, 0) > 0
+    }
+
+    /// Screenshots currently in the screenshot folder, grouped by file size.
+    /// Used to find originals of history items saved before 1.2.1 (no recorded path).
+    private func screenshotsBySize() -> [Int: [URL]] {
+        let folder = Prefs.screenshotFolder()
+        let urls = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey])) ?? []
+        var map: [Int: [URL]] = [:]
+        for u in urls where Self.isScreenshot(u) {
+            if let s = try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize { map[s, default: []].append(u) }
+        }
+        return map
+    }
+
+    private func original(of copy: URL, index: inout [Int: [URL]]?) -> URL? {
+        if let o = Self.recordedOriginal(of: copy) {
+            // Only touch it if it's still there and still a screenshot.
+            return FileManager.default.fileExists(atPath: o.path) && Self.isScreenshot(o) ? o : nil
+        }
+        // Older items: same size and same bytes as a screenshot in the folder.
+        if index == nil { index = screenshotsBySize() }
+        guard let size = try? copy.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              let candidates = index?[size], let data = try? Data(contentsOf: copy) else { return nil }
+        return candidates.first { (try? Data(contentsOf: $0)) == data }
+    }
+
+    private func remove(_ url: URL, permanently: Bool) {
         if permanently { try? FileManager.default.removeItem(at: url) }
         else { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+    }
+
+    /// Deletes one history item, and its original screenshot if that setting is on.
+    func delete(_ url: URL, permanently: Bool) {
+        var index: [Int: [URL]]?
+        if Self.deleteOriginals, let o = original(of: url, index: &index) { remove(o, permanently: permanently) }
+        remove(url, permanently: permanently)
         Thumbs.cache.removeObject(forKey: url as NSURL)
         reload()
     }
 
     /// permanently: true deletes the files for good instead of moving them to the Trash.
     func clear(permanently: Bool) {
+        var index: [Int: [URL]]?
         for s in shots {
-            if permanently { try? FileManager.default.removeItem(at: s.url) }
-            else { try? FileManager.default.trashItem(at: s.url, resultingItemURL: nil) }
+            if Self.deleteOriginals, let o = original(of: s.url, index: &index) { remove(o, permanently: permanently) }
+            remove(s.url, permanently: permanently)
         }
         Thumbs.cache.removeAllObjects()
         reload()

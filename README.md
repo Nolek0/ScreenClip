@@ -114,6 +114,7 @@ Open **Settings…** from the menu (or open ScreenClip again from your Applicati
   `~/Library/Application Support/ScreenClip/History`.
 - At the top of the submenu, the red **Clear History** button empties the history. By default the files go to the Trash.
 - Tick **Skip Trash (Delete Permanently)** right below it to delete them for good instead. ScreenClip asks for confirmation first, since this can't be undone.
+- **Also delete the original screenshots** (on by default): clearing the history, or deleting a screenshot from it, also removes the original screenshot file from your Desktop. Only files macOS tagged as screenshots are touched.
 - **Right-click** (or Control-click) a screenshot to show quick actions over its preview: **Copy**, **Open**, **Finder**, **AirDrop** and **Delete**.
 - At the bottom of the submenu: **Open History Folder**.
 

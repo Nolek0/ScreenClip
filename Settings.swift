@@ -253,6 +253,7 @@ struct HistoryPane: View {
     @AppStorage("clickToCopy") private var clickToCopy = true
     @AppStorage("historyMenuCount") private var menuCount = 30
     @AppStorage("permanentDelete") private var permanentDelete = false
+    @AppStorage("deleteOriginals") private var deleteOriginals = true
     @ObservedObject private var store = HistoryStore.shared
 
     var body: some View {
@@ -269,6 +270,9 @@ struct HistoryPane: View {
                 LabeledContent(L("Saved screenshots")) {
                     Text("\(store.shots.count)").monospacedDigit().foregroundStyle(.secondary)
                 }
+                DetailToggle(title: L("Also delete the original screenshots"),
+                             detail: L("Clearing or deleting from the history also removes the screenshot files from your Desktop."),
+                             isOn: $deleteOriginals)
                 Toggle(L("Skip Trash when clearing"), isOn: $permanentDelete)
                 HStack {
                     Button(L("Open History Folder")) { NSWorkspace.shared.open(store.dir) }

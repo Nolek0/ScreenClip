@@ -261,6 +261,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let perm = item(L("Skip Trash (Delete Permanently)"), #selector(togglePermanent))
         perm.state = permanentDelete ? .on : .off
         menu.addItem(perm)
+        let orig = item(L("Also delete the original screenshots"), #selector(toggleDeleteOriginals))
+        orig.state = HistoryStore.deleteOriginals ? .on : .off
+        menu.addItem(orig)
         menu.addItem(.separator())
         let header = NSMenuItem(title: clickToCopy ? L("Click a screenshot to copy it") : L("Click a screenshot to open it"),
                                 action: nil, keyEquivalent: "")
@@ -308,6 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if clickToCopy { _ = writeImage(url) } else { NSWorkspace.shared.open(url) }
     }
     @objc func openHistoryFolder() { NSWorkspace.shared.open(HistoryStore.shared.dir) }
+    @objc func toggleDeleteOriginals() { defaults.set(!HistoryStore.deleteOriginals, forKey: "deleteOriginals") }
     @objc func togglePermanent() { defaults.set(!permanentDelete, forKey: "permanentDelete") }
 
     func clearHistory() {
