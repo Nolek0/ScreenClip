@@ -265,6 +265,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let header = NSMenuItem(title: clickToCopy ? L("Click a screenshot to copy it") : L("Click a screenshot to open it"),
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
+        if #available(macOS 14.4, *) { header.subtitle = L("Right-click for more options") }
         menu.addItem(header)
         let fmt = DateFormatter()
         fmt.locale = Lang.locale
@@ -272,13 +273,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for shot in store.shots.prefix(historyMenuCount) {
             let url = shot.url
             let row = NSMenuItem()
-            row.view = ShotMenuView(image: Thumbs.load(url), title: fmt.string(from: shot.date)) { [weak self] in
+            let view = ShotMenuView(image: Thumbs.load(url), title: fmt.string(from: shot.date)) { [weak self] in
                 self?.historyClicked(url)
             }
+            view.actions = shotActions(url)
+            row.view = view
             menu.addItem(row)
         }
         menu.addItem(.separator())
         menu.addItem(item(L("Open History Folder"), #selector(openHistoryFolder)))
+    }
+
+    // MARK: Right-click menu on a history screenshot
+
+    func shotActions(_ url: URL) -> [ShotAction] {
+        var list = [
+            ShotAction(symbol: "doc.on.doc", title: L("Copy"), closesMenu: true) { [weak self] in _ = self?.writeImage(url) },
+            ShotAction(symbol: "eye", title: L("Open"), closesMenu: true) { NSWorkspace.shared.open(url) },
+            ShotAction(symbol: "folder", title: "Finder", closesMenu: true) { NSWorkspace.shared.activateFileViewerSelecting([url]) },
+        ]
+        if let airdrop = NSSharingService(named: .sendViaAirDrop), airdrop.canPerform(withItems: [url]) {
+            list.append(ShotAction(symbol: "dot.radiowaves.left.and.right", title: "AirDrop", closesMenu: true) {
+                NSApp.activate(ignoringOtherApps: true)
+                airdrop.perform(withItems: [url])
+            })
+        }
+        list.append(ShotAction(symbol: "trash", title: L("Delete"), closesMenu: true) { [weak self] in
+            HistoryStore.shared.delete(url, permanently: self?.permanentDelete ?? false)
+        })
+        return list
     }
 
     func historyClicked(_ url: URL) {

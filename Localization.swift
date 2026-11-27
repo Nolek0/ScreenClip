@@ -59,6 +59,12 @@ private let translations: [String: [String]] = [
     "Couldn't change Launch at Login": ["Impossible de modifier l'ouverture au démarrage", "No se pudo cambiar el inicio de sesión", "Anmeldeobjekt konnte nicht geändert werden", "Impossibile modificare l'apertura al login", "Não foi possível alterar a abertura no login", "无法更改登录时打开", "ログイン時の起動を変更できません", "로그인 시 열기를 변경할 수 없습니다", "Не удалось изменить автозапуск"],
     "Move ScreenClip.app to your Applications folder and try again.": ["Place ScreenClip.app dans le dossier Applications puis réessaie.", "Mueve ScreenClip.app a la carpeta Aplicaciones e inténtalo de nuevo.", "Bewege ScreenClip.app in den Ordner Programme und versuche es erneut.", "Sposta ScreenClip.app nella cartella Applicazioni e riprova.", "Mova o ScreenClip.app para a pasta Aplicativos e tente novamente.", "请将 ScreenClip.app 移到“应用程序”文件夹后重试。", "ScreenClip.app をアプリケーションフォルダに移動してもう一度お試しください。", "ScreenClip.app을 응용 프로그램 폴더로 옮긴 후 다시 시도하세요.", "Переместите ScreenClip.app в папку «Программы» и повторите попытку."],
 
+    "Copy": ["Copier", "Copiar", "Kopieren", "Copia", "Copiar", "拷贝", "コピー", "복사", "Копировать"],
+    "Open": ["Ouvrir", "Abrir", "Öffnen", "Apri", "Abrir", "打开", "開く", "열기", "Открыть"],
+    "Right-click for more options": ["Clic droit pour plus d'options", "Clic derecho para más opciones", "Rechtsklick für weitere Optionen", "Clic destro per altre opzioni", "Clique com o botão direito para mais opções", "右键点按以获取更多选项", "右クリックでその他のオプション", "더 많은 옵션은 오른쪽 클릭", "Правый клик — другие действия"],
+    "Share": ["Partager", "Compartir", "Teilen", "Condividi", "Compartilhar", "共享", "共有", "공유", "Поделиться"],
+    "Delete": ["Supprimer", "Eliminar", "Löschen", "Elimina", "Excluir", "删除", "削除", "삭제", "Удалить"],
+
     // Settings window
     "ScreenClip Settings": ["Réglages de ScreenClip", "Ajustes de ScreenClip", "ScreenClip-Einstellungen", "Impostazioni di ScreenClip", "Ajustes do ScreenClip", "ScreenClip 设置", "ScreenClip 設定", "ScreenClip 설정", "Настройки ScreenClip"],
     "General": ["Général", "General", "Allgemein", "Generali", "Geral", "通用", "一般", "일반", "Основные"],

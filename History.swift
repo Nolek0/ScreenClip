@@ -52,8 +52,10 @@ final class HistoryStore: ObservableObject {
         if shots.count > Self.maxItems { reload() }
     }
 
-    func delete(_ shot: Shot) {
-        try? FileManager.default.trashItem(at: shot.url, resultingItemURL: nil)
+    func delete(_ url: URL, permanently: Bool) {
+        if permanently { try? FileManager.default.removeItem(at: url) }
+        else { try? FileManager.default.trashItem(at: url, resultingItemURL: nil) }
+        Thumbs.cache.removeObject(forKey: url as NSURL)
         reload()
     }
 
@@ -87,16 +89,32 @@ enum Thumbs {
 
 // MARK: Menu row with a visible preview
 
+/// A button shown over the preview after a right-click.
+struct ShotAction {
+    let symbol: String
+    let title: String
+    /// true: close the History menu before running (needed for AirDrop, Finder…).
+    let closesMenu: Bool
+    let run: () -> Void
+}
+
 /// Custom menu row: big preview + date. Menus ignore large item images, so we draw our own view.
+/// Right-click (or ctrl-click) shows action buttons over the preview, inside the menu.
 final class ShotMenuView: NSView {
     let onClick: () -> Void
+    var actions: [ShotAction] = [] { didSet { overlay.actions = actions } }
     private var hovered = false { didSet { needsDisplay = true } }
+    private let overlay = ActionOverlay()
+    private var showingActions = false {
+        didSet { overlay.isHidden = !showingActions; overlay.hoverIndex = nil }
+    }
     static let width: CGFloat = 280, previewH: CGFloat = 150
+    private var previewFrame: NSRect { NSRect(x: 14, y: 26, width: Self.width - 28, height: Self.previewH) }
 
     init(image: NSImage?, title: String, onClick: @escaping () -> Void) {
         self.onClick = onClick
         super.init(frame: NSRect(x: 0, y: 0, width: Self.width, height: Self.previewH + 34))
-        let iv = NSImageView(frame: NSRect(x: 14, y: 26, width: Self.width - 28, height: Self.previewH))
+        let iv = NSImageView(frame: previewFrame)
         iv.image = image
         iv.imageScaling = .scaleProportionallyUpOrDown
         iv.wantsLayer = true
@@ -104,14 +122,20 @@ final class ShotMenuView: NSView {
         iv.layer?.masksToBounds = true
         iv.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.15).cgColor
         addSubview(iv)
+        overlay.frame = previewFrame
+        overlay.isHidden = true
+        addSubview(overlay)
         let label = NSTextField(labelWithString: title)
         label.font = .systemFont(ofSize: 12)
         label.textColor = .secondaryLabelColor
         label.frame = NSRect(x: 14, y: 5, width: Self.width - 28, height: 16)
         addSubview(label)
-        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect], owner: self))
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    // Keep every click for this view (the image and label must not swallow them).
+    override func hitTest(_ point: NSPoint) -> NSView? { frame.contains(point) ? self : nil }
 
     override func draw(_ dirtyRect: NSRect) {
         if hovered {
@@ -120,11 +144,87 @@ final class ShotMenuView: NSView {
         }
     }
     override func mouseEntered(with e: NSEvent) { hovered = true }
-    override func mouseExited(with e: NSEvent) { hovered = false }
+    override func mouseExited(with e: NSEvent) { hovered = false; showingActions = false }
+    override func mouseMoved(with e: NSEvent) {
+        guard showingActions else { return }
+        overlay.hoverIndex = overlay.index(at: overlay.convert(e.locationInWindow, from: nil))
+    }
+    override func mouseDown(with e: NSEvent) {}
     override func mouseUp(with e: NSEvent) {
+        if e.modifierFlags.contains(.control) { return toggleActions() }  // ctrl-click = right-click
+        if showingActions {
+            if let i = overlay.index(at: overlay.convert(e.locationInWindow, from: nil)) {
+                let action = actions[i]
+                if action.closesMenu {
+                    closeMenu()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { action.run() }
+                } else {
+                    action.run()
+                    showingActions = false
+                }
+            } else {
+                showingActions = false
+            }
+            return
+        }
+        closeMenu()
+        onClick()
+    }
+    override func rightMouseDown(with e: NSEvent) { toggleActions() }
+    override func rightMouseUp(with e: NSEvent) {}
+
+    private func toggleActions() {
+        guard !actions.isEmpty else { return }
+        showingActions.toggle()
+        if showingActions {
+            overlay.hoverIndex = overlay.index(at: overlay.convert(window?.mouseLocationOutsideOfEventStream ?? .zero, from: nil))
+        }
+    }
+    private func closeMenu() {
         enclosingMenuItem?.menu?.supermenu?.cancelTracking()
         enclosingMenuItem?.menu?.cancelTracking()
-        onClick()
+    }
+}
+
+/// Dark layer over the preview with round icon buttons.
+final class ActionOverlay: NSView {
+    var actions: [ShotAction] = [] { didSet { needsDisplay = true } }
+    var hoverIndex: Int? { didSet { if oldValue != hoverIndex { needsDisplay = true } } }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    private func slot(_ i: Int) -> NSRect {
+        let w = bounds.width / CGFloat(max(actions.count, 1))
+        return NSRect(x: CGFloat(i) * w, y: 0, width: w, height: bounds.height)
+    }
+    func index(at p: NSPoint) -> Int? {
+        guard bounds.contains(p) else { return nil }
+        return actions.indices.first { slot($0).contains(p) }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.black.withAlphaComponent(0.62).setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: 6, yRadius: 6).fill()
+        let d: CGFloat = 38
+        for (i, a) in actions.enumerated() {
+            let s = slot(i)
+            let circle = NSRect(x: s.midX - d / 2, y: s.midY - 2, width: d, height: d)
+            let hot = hoverIndex == i
+            (a.symbol == "trash" ? NSColor.systemRed : (hot ? NSColor.controlAccentColor : NSColor.white.withAlphaComponent(0.18))).setFill()
+            NSBezierPath(ovalIn: circle).fill()
+            if hot && a.symbol == "trash" {
+                NSColor.white.withAlphaComponent(0.25).setFill(); NSBezierPath(ovalIn: circle).fill()
+            }
+            let cfg = NSImage.SymbolConfiguration(pointSize: 15, weight: .semibold).applying(.init(paletteColors: [.white]))
+            if let img = NSImage(systemSymbolName: a.symbol, accessibilityDescription: a.title)?.withSymbolConfiguration(cfg) {
+                let sz = img.size
+                img.draw(in: NSRect(x: circle.midX - sz.width / 2, y: circle.midY - sz.height / 2, width: sz.width, height: sz.height))
+            }
+            let para = NSMutableParagraphStyle(); para.alignment = .center; para.lineBreakMode = .byTruncatingTail
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 9, weight: .medium),
+                                                        .foregroundColor: NSColor.white, .paragraphStyle: para]
+            (a.title as NSString).draw(in: NSRect(x: s.minX, y: circle.minY - 17, width: s.width, height: 13), withAttributes: attrs)
+        }
     }
 }
 

@@ -24,7 +24,7 @@ ScreenClip is a tiny macOS app that runs quietly in the background. It has no Do
 | | Feature | Details |
 |---|---|---|
 | 📋 | **Auto-copy** | Every screenshot (⌘⇧3, ⌘⇧4, ⌘⇧5) goes straight to the clipboard. |
-| 🕘 | **History** | A submenu shows your last 30 screenshots with a large preview. Click one to copy it again. |
+| 🕘 | **History** | A submenu shows your last 30 screenshots with a large preview. Click one to copy it again, or right-click it to AirDrop it, show it in Finder, open or delete it. |
 | ⚡ | **Thumbnail on/off** | Show or hide the macOS corner thumbnail. Hiding it makes copying instant (it delays saving by about 5 seconds). |
 | 🗑️ | **Delete After Copying** | Moves the file to the Trash once copied, so your Desktop stays clean. |
 | 🚀 | **Launch at Login** | ScreenClip starts with your Mac. |
@@ -114,6 +114,7 @@ Open **Settings…** from the menu (or open ScreenClip again from your Applicati
   `~/Library/Application Support/ScreenClip/History`.
 - At the top of the submenu, the red **Clear History** button empties the history. By default the files go to the Trash.
 - Tick **Skip Trash (Delete Permanently)** right below it to delete them for good instead. ScreenClip asks for confirmation first, since this can't be undone.
+- **Right-click** (or Control-click) a screenshot to show quick actions over its preview: **Copy**, **Open**, **Finder**, **AirDrop** and **Delete**.
 - At the bottom of the submenu: **Open History Folder**.
 
 ## ⚙️ How it works
